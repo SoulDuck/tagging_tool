@@ -14,8 +14,9 @@ class VideoTagging(Frame):
         self._extractImages(self.video_path, self.path_out)
         self.get_video_height()
         self.img_paths = self.get_image_paths(self.path_out)
-        self.draw_Canvas(self.img_paths[0] )
         self.image_counter = 0
+        self.draw_Canvas(self.img_paths[0] )
+
     # video 에서 이미지를 추출합니다
     def _extractImages(self, pathIn, pathOut):
         self.vidcap = cv2.VideoCapture(pathIn)
@@ -56,30 +57,43 @@ class VideoTagging(Frame):
             ret_list.append(ImageTk.PhotoImage(img))
         return ret_list
 
-
     def next_image(self):
         """
         여기에 이 코드를넣으면 백새 화면이 뜨고 진행되질 않는다 왜 그럴까?
         self.img1=Image.open('1.jpg')
         self.img1 = ImageTk.PhotoImage(self.img1)
-
         :return:
         """
         self.canv.itemconfig(self.image_on_canvas, image= self.img_list[self.image_counter])
         self.image_counter +=1
+        # Change Text Label
+        self.text_label1['text']="{}/{}".format(self.image_counter ,len(self.img_list))
+
+    def prev_image(self):
+        """
+        여기에 이 코드를넣으면 백새 화면이 뜨고 진행되질 않는다 왜 그럴까?
+        self.img1=Image.open('1.jpg')
+        self.img1 = ImageTk.PhotoImage(self.img1)
+        :return:
+        """
+        self.canv.itemconfig(self.image_on_canvas, image= self.img_list[self.image_counter])
+        self.image_counter -= 1
+        # Change Text Label
+        self.text_label1['text']="{}/{}".format(self.image_counter ,len(self.img_list))
+
+
+
+
 
     def draw_Canvas(self , image_path ):
         # Load Image
         img=Image.open(image_path)
         width , height =img.size
-        # Draw CANVAS
+
+        # tKinter 가 적용된 이미지를 얻어온다
         self.img_list = self.get_photo_images(self.img_paths)
 
-
-        self.img1=Image.open('1.jpg')
-        self.img1 = ImageTk.PhotoImage(self.img1)
-
-
+        # Draw CANVAS
         self.canv = Canvas(root, relief=SUNKEN, width=width, height=height)
         self.canv.pack(side=TOP, anchor=NW, padx=10, pady=10)
         # 왜 여기서 self.quit 을 쓰면 안되지
@@ -89,6 +103,13 @@ class VideoTagging(Frame):
 
         button2 = Button(self.root , text="next Image", command=self.next_image )
         button2.grid(row=2, column=0)
+
+        button3 = Button(self.root, text="prev Image", command=self.prev_image)
+        button3.grid(row=2, column=1)
+
+        self.text_label1 = Label(self.root, text="{}/{}".format(self.image_counter ,len(self.img_list)) )
+        self.text_label1.grid(row=3, column=0)
+
 
         sbarv=Scrollbar(self.root,orient=VERTICAL)
         sbarh=Scrollbar(self.root,orien=HORIZONTAL)
@@ -119,6 +140,7 @@ class VideoTagging(Frame):
     def _on_move_press(self ,event):
         curX , curY = (event.x , event.y)
         self.canv.coords(self.rect, self.start_x, self.start_y, curX, curY)
+
     def _on_button_release(self , event):
         pass;
 
