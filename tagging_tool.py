@@ -3,7 +3,8 @@ import tkinter
 from tkinter import messagebox
 from Tkinter import *
 from PIL import Image ,ImageTk
-import cv2 , os , glob , copy
+import cv2 , os , glob
+import json
 # Ref from https://stackoverflow.com/questions/29789554/tkinter-draw-rectangle-using-a-mouse
 
 class VideoTagging(Frame):
@@ -18,6 +19,7 @@ class VideoTagging(Frame):
         self.draw_Canvas(self.img_paths[0] )
         self.labels = {}  # key = page , value = [label]
         self.rects = {} # key = page , value = [label]
+        self.jsondir = './coordinates'
     # video 에서 이미지를 추출합니다
     def _extractImages(self, pathIn, pathOut):
         self.vidcap = cv2.VideoCapture(pathIn)
@@ -95,6 +97,35 @@ class VideoTagging(Frame):
         # reload coordinate
         self._renew_coordinates(self.image_counter)
 
+    # export Json
+    def export_coords(self):
+        # Json Format : {page  : {label : [1,2] , coord : [[4,5,6,7],[8,9,0,1]] }}
+        # Check
+        assert len(self.labels) == len(self.rects)
+        n_index = len(self.labels)
+        coords = []
+        json_dict = {}
+
+        for key in self.labels:
+            target_labels = self.labels[key]
+            target_coords = self._get_coordinate(key)
+            assert len(target_labels) == len(target_coords) , '{}'.format(key)
+            json_dict[key] = {'label' : target_labels , 'coords' : target_coords}
+
+        jsonpath = os.path.join(self.jsondir , 'coordinates.json')
+        f=open(jsonpath , 'w')
+        print json_dict
+        json_object=json.dumps(json_dict)
+        f.write(json_object)
+        f.close()
+
+        f = open(jsonpath, 'r')
+        print json.load(f)
+
+
+
+
+
 
     ##### COORDINATE #####
     def _get_coordinate(self , index):
@@ -102,10 +133,7 @@ class VideoTagging(Frame):
         ret_coords = []
         try:
             for rect in self.rects[index]:
-                print 'rect',rect
-                print type(rect)
                 x1,y1,x2,y2 = self.canv.coords(rect)
-                print x1,y1,x2,y2
                 ret_coords.append([x1,y1,x2,y2])
             return ret_coords
         except KeyError as ke: # 해당 index 에 저장된 rect들이 없음
@@ -113,7 +141,6 @@ class VideoTagging(Frame):
         except Exception as e :
             print e
             print 'Error from def _get_coordinate'
-
             exit()
 
 
@@ -212,9 +239,10 @@ class VideoTagging(Frame):
         button2.grid(row=1, column= 26 , sticky = W)
         # button2.pack(side = LEFT) , # 위에서 그리드 잡았다가 pack을하니깐 안된다
         button3 = Button(self.root, text="prev Image", command=self.prev_image)
-        button3.grid(row=1, column= 24 , sticky = W )
-        # button3.pack(side=LEFT)
-
+        button3.grid(row=1, column= 25 , sticky = W )
+        # export Json
+        button4 = Button(self.root, text="Export", command=self.export_coords)
+        button4.grid(row=1, column=27, sticky=W)
 
         self.entry = Entry(self.root , text = 'Hello')
         self.entry.grid(row =3 ,column = 26  )
