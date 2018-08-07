@@ -1,9 +1,9 @@
 #-*- coding:utf-8 -*-
 import tkinter
+from tkinter import messagebox
 from Tkinter import *
-
 from PIL import Image ,ImageTk
-import cv2 , os , glob
+import cv2 , os , glob , copy
 # Ref from https://stackoverflow.com/questions/29789554/tkinter-draw-rectangle-using-a-mouse
 
 class VideoTagging(Frame):
@@ -16,7 +16,8 @@ class VideoTagging(Frame):
         self.img_paths = self.get_image_paths(self.path_out)
         self.image_counter = 0
         self.draw_Canvas(self.img_paths[0] )
-
+        self.labels = {}  # key = page , value = [label]
+        self.rects = {} # key = page , value = [label]
     # video 에서 이미지를 추출합니다
     def _extractImages(self, pathIn, pathOut):
         self.vidcap = cv2.VideoCapture(pathIn)
@@ -64,11 +65,17 @@ class VideoTagging(Frame):
         self.img1 = ImageTk.PhotoImage(self.img1)
         :return:
         """
+        # 이전 페이지에 있던 정보를 다 지워 버립니다
+        self._hidden_rects(self.image_counter)
+        # 새로운 이미지를 Canvas 에 띄웁니다
+        self.image_counter += 1
         self.canv.itemconfig(self.image_on_canvas, image= self.img_list[self.image_counter])
-        self.image_counter +=1
-        # Change Text Label
+        # 새로운 이미지에 matching 되는 rect 들의 정보들을 가져와 화면에 그립니다.
+        self._load_rects(self.image_counter)
+        # 이미지의 순서를 보여줍니다
         self.text_label1['text']="{}/{}".format(self.image_counter ,len(self.img_list))
-
+        # reload coordinate
+        self._renew_coordinates(self.image_counter)
     def prev_image(self):
         """
         여기에 이 코드를넣으면 백새 화면이 뜨고 진행되질 않는다 왜 그럴까?
@@ -76,11 +83,99 @@ class VideoTagging(Frame):
         self.img1 = ImageTk.PhotoImage(self.img1)
         :return:
         """
-        self.canv.itemconfig(self.image_on_canvas, image= self.img_list[self.image_counter])
+        # 이전 페이지에 있던 정보를 다 지워 버립니다
+        self._hidden_rects(self.image_counter)
+        # 새로운 이미지를 Canvas 에 띄웁니다
         self.image_counter -= 1
-        # Change Text Label
+        self.canv.itemconfig(self.image_on_canvas, image= self.img_list[self.image_counter])
+        # 새로운 이미지에 matching 되는 rect 들의 정보들을 가져와 화면에 그립니다.
+        self._load_rects(self.image_counter)
+        # 이미지의 순서를 보여줍니다
         self.text_label1['text']="{}/{}".format(self.image_counter ,len(self.img_list))
+        # reload coordinate
+        self._renew_coordinates(self.image_counter)
 
+
+    ##### COORDINATE #####
+    def _get_coordinate(self , index):
+        # 해당 index 에 저장되어 있는 rect 로 부터 좌표를 추출합니다
+        ret_coords = []
+        try:
+            for rect in self.rects[index]:
+                print 'rect',rect
+                print type(rect)
+                x1,y1,x2,y2 = self.canv.coords(rect)
+                print x1,y1,x2,y2
+                ret_coords.append([x1,y1,x2,y2])
+            return ret_coords
+        except KeyError as ke: # 해당 index 에 저장된 rect들이 없음
+            return None
+        except Exception as e :
+            print e
+            print 'Error from def _get_coordinate'
+
+            exit()
+
+
+    # rect >> label >> save rect, label >> renew_coordinate
+    def _renew_coordinates(self , index):
+        # 오른쪽 상단의 좌표를 갱신합니다
+        self.text_label2['text'] = ''
+        # Get Coordinates from saved rectangles
+        target_coords = self._get_coordinate(index = index)
+        print target_coords
+
+        if not target_coords is None:
+            # Rectangle 을 그리고 enter 을 쳤을때
+            target_labels = self.labels[self.image_counter]
+            assert len(target_coords) == len(target_labels)
+            labels_coords = zip(target_labels , target_coords)
+            for label , coord in labels_coords:
+                x1 ,y1 , x2 , y2  = coord
+                self.text_label2['text'] += "{} : {} {} {} \n".format(label, x1 ,y1 ,x2 ,y2 )
+
+            # 저장된 좌표 , 라벨이 있다
+            return True
+        else :
+            return False
+
+    ##### LABEL #####
+    def _add_labels(self , value , index):
+        try:
+            self.labels[index].append(value)
+        except KeyError as ke:
+            self.labels[index] = [value]
+
+    ##### RECT #####
+    def _add_rect(self , rect ,index):
+        try:
+            self.rects[index].append(rect)
+        except KeyError as ke:
+            self.rects[index] = [rect]
+
+    def _hidden_rects(self , index):
+        try:
+            for rect in self.rects[index]:
+                self.canv.itemconfig(rect ,state='hidden' )
+                print 'hidden'
+        except KeyError as ke:
+            return ;
+        except Exception as e:
+            print 'Error from def _delete_rects'
+            print e
+            exit()
+
+    def _load_rects(self , index):
+        try:
+            for rect in self.rects[index]:
+                self.canv.itemconfig(rect ,state='normal' )
+                print 'normal'
+        except KeyError as ke:
+            return ;
+        except Exception as e:
+            print 'Error from def _delete_rects'
+            print e
+            exit()
 
     def draw_Canvas(self , image_path ):
         # Load Image
@@ -93,9 +188,8 @@ class VideoTagging(Frame):
         # Draw CANVAS
         self.canv = Canvas(root, relief=SUNKEN, width=width, height=height)
         self.canv.pack(side=TOP, anchor=NW, padx=10, pady=10)
-
-
         """
+        # Scroll 기능 
         sbarv=Scrollbar(self.root,orient=VERTICAL)
         sbarh=Scrollbar(self.root,orien=HORIZONTAL)
         sbarv.config(command=self.canv.yview)
@@ -108,48 +202,91 @@ class VideoTagging(Frame):
         """
         self.canv.grid(row=0, column=0, sticky=N + S + E + W , columnspan = 50)
 
-
         # 왜 여기서 self.quit 을 쓰면 안되지
         button1 = Button(text="Quit", command=quit, anchor=W)
         button1.configure(width=10, activebackground="#33B5E5", relief=SUNKEN)
         button1_window = self.canv.create_window(10, 10, anchor=NW, window=button1)
 
-        # 위에서 그리드 잡았다가 pack을하니깐 안된다
+        # Next | Prev Button Event
         button2 = Button(self.root , text="next Image", command=self.next_image )
         button2.grid(row=1, column= 26 , sticky = W)
-        #button2.pack(side = LEFT)
-
+        # button2.pack(side = LEFT) , # 위에서 그리드 잡았다가 pack을하니깐 안된다
         button3 = Button(self.root, text="prev Image", command=self.prev_image)
         button3.grid(row=1, column= 24 , sticky = W )
-        #button3.pack(side=LEFT)
+        # button3.pack(side=LEFT)
 
+
+        self.entry = Entry(self.root , text = 'Hello')
+        self.entry.grid(row =3 ,column = 26  )
+        self.entry.bind("<Key>" , self._input_label)
+
+        # 동영상에서 자른 이미지 순서를 보여줍니다
         self.text_label1 = Label(self.root, text="{}/{}".format(self.image_counter ,len(self.img_list)) )
         self.text_label1.grid(row=3, column=25)
 
+        # 저장된 rectangle 좌표를 가져옵니다. 오른쪽 상단에 보여줍니다
+        self.text_label2 = Label(self.root, text="Coordinate \n")
+        self.text_label2.grid(row=0, column=51 , sticky = N)
 
-
+        # Event Binding
         self.canv.bind("<ButtonPress-1>", self._on_button_press)
         self.canv.bind("<B1-Motion>", self._on_move_press)
         self.canv.bind("<ButtonRelease-1>", self._on_button_release)
+        #self.canv.bind("<Key>" , self._key_press )
+        #self.canv.bind("<Button-1>", self._button_click)
 
+        # 위즐 생성
         self.wazil,self.lard = img.size
         self.canv.config(scrollregion=(0,0,self.wazil,self.lard))
         self.tk_im = ImageTk.PhotoImage(img)
         self.image_on_canvas = self.canv.create_image(0,0,anchor="nw",image=self.tk_im)
 
+
+    # Define event Callback function
     def _on_button_press(self ,event):
         self.start_x = event.x
         self.start_y = event.y
-        #self.x = self.start_x + 1
-        #self.y = self.start_y + 1
+        # self.x = self.start_x + 1
+        # self.y = self.start_y + 1
         self.rect = self.canv.create_rectangle(self.start_x, self.start_y, self.start_x + 1, self.start_y + 1, fill="")
         pass;
+
     def _on_move_press(self ,event):
         curX , curY = (event.x , event.y)
         self.canv.coords(self.rect, self.start_x, self.start_y, curX, curY)
 
     def _on_button_release(self , event):
-        pass;
+        self.endX , endY  = event.x , event.y
+        self.entry.focus_set() #
+
+    def _input_label(self , event):
+        # Label 을 입력합니다.
+        # input digit >> check digit >> press enter >> save rect , label >> renew coordinate
+        print self.entry.focus_get()
+        if self.entry.get() != '' and event.char == '\r':
+            label = self.entry.get()
+            self.entry.delete(0, END)
+            # digit checking
+            self.save_rect_label(self.rect, label, self.image_counter)
+            self._renew_coordinates(self.image_counter)
+            pass;
+
+        elif self.entry.get() == '' and event.char == '\r': # focus 가 벗어나면 alert msg 보이고 다시 focus을 entry에 줍니다
+            messagebox.showinfo('Label 을 입력하세요')
+            self.entry.delete(0, END)
+            self.entry.focus_set()
+
+
+    def save_rect_label(self , rect ,label  , index ):
+        self._add_rect(rect , index)
+        self._add_labels(label , index)
+
+    def _button_click(self , event):
+        self.canv.focus_set()
+        print "clicked at", event.x, event.y
+
+
+
 
 
 if __name__ == '__main__':
