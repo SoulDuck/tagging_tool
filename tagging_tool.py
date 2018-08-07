@@ -82,35 +82,20 @@ class VideoTagging(Frame):
         self.text_label1['text']="{}/{}".format(self.image_counter ,len(self.img_list))
 
 
-
-
-
     def draw_Canvas(self , image_path ):
         # Load Image
         img=Image.open(image_path)
         width , height =img.size
 
-        # tKinter 가 적용된 이미지를 얻어온다
+        # tKinter 가 적용된 이미지를 얻어온다 , prev , next 버튼을 누르면 이전 또는 다음 이미지가 불러와집니다
         self.img_list = self.get_photo_images(self.img_paths)
 
         # Draw CANVAS
         self.canv = Canvas(root, relief=SUNKEN, width=width, height=height)
         self.canv.pack(side=TOP, anchor=NW, padx=10, pady=10)
-        # 왜 여기서 self.quit 을 쓰면 안되지
-        button1 = Button(text="Quit", command=quit, anchor=W)
-        button1.configure(width=10, activebackground="#33B5E5", relief=SUNKEN)
-        button1_window = self.canv.create_window(10, 10, anchor=NW, window=button1)
-
-        button2 = Button(self.root , text="next Image", command=self.next_image )
-        button2.grid(row=2, column=0)
-
-        button3 = Button(self.root, text="prev Image", command=self.prev_image)
-        button3.grid(row=2, column=1)
-
-        self.text_label1 = Label(self.root, text="{}/{}".format(self.image_counter ,len(self.img_list)) )
-        self.text_label1.grid(row=3, column=0)
 
 
+        """
         sbarv=Scrollbar(self.root,orient=VERTICAL)
         sbarh=Scrollbar(self.root,orien=HORIZONTAL)
         sbarv.config(command=self.canv.yview)
@@ -120,6 +105,28 @@ class VideoTagging(Frame):
         self.canv.grid(row=0,column=0,sticky=N+S+E+W)
         sbarv.grid(row=0,column=1,sticky=N+S)
         sbarh.grid(row=1,column=0,sticky=E+W)
+        """
+        self.canv.grid(row=0, column=0, sticky=N + S + E + W , columnspan = 50)
+
+
+        # 왜 여기서 self.quit 을 쓰면 안되지
+        button1 = Button(text="Quit", command=quit, anchor=W)
+        button1.configure(width=10, activebackground="#33B5E5", relief=SUNKEN)
+        button1_window = self.canv.create_window(10, 10, anchor=NW, window=button1)
+
+        # 위에서 그리드 잡았다가 pack을하니깐 안된다
+        button2 = Button(self.root , text="next Image", command=self.next_image )
+        button2.grid(row=1, column= 26 , sticky = W)
+        #button2.pack(side = LEFT)
+
+        button3 = Button(self.root, text="prev Image", command=self.prev_image)
+        button3.grid(row=1, column= 24 , sticky = W )
+        #button3.pack(side=LEFT)
+
+        self.text_label1 = Label(self.root, text="{}/{}".format(self.image_counter ,len(self.img_list)) )
+        self.text_label1.grid(row=3, column=25)
+
+
 
         self.canv.bind("<ButtonPress-1>", self._on_button_press)
         self.canv.bind("<B1-Motion>", self._on_move_press)
