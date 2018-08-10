@@ -8,3 +8,10 @@
     - 객체를 숨기고 / 보여지게 할수 있다
     - mycanvas.itemconfigure("highlight", state='hidden')
     - mycanvas.itemconfigure("highlight", state='normal')
+
+
+
++ 기능들
+ - 지우는 기능
+ - json 파일 export 위치
+ -

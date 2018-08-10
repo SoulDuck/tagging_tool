@@ -29,7 +29,7 @@ class VideoTagging(Frame):
         success = True
         self.ext = 'jpg'
         while success:
-            self.vidcap.set(cv2.CAP_PROP_POS_MSEC, (count * 10000))  # added this line
+            self.vidcap.set(cv2.CAP_PROP_POS_MSEC, (count * 1000))  # added this line
             success, image = self.vidcap.read()
             print ('Read a new frame: ', success)
             cv2.imwrite(os.path.join(pathOut, "frame{}.{}".format(count , self.ext)), image)  # save frame as JPEG file
