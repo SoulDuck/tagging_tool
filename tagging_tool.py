@@ -33,8 +33,6 @@ class VideoTagging(Frame):
             return
         else:
             os.makedirs(pathOut)
-
-
         while success:
             self.vidcap.set(cv2.CAP_PROP_POS_MSEC, ( count * 100 ))  # added this line
             success, image = self.vidcap.read()
@@ -117,20 +115,28 @@ class VideoTagging(Frame):
         else:
             target_rects = self.rects[page_index]
             target_labels = self.labels[page_index]
-            target_text = self.labels[page_index]
+            target_texts = self.texts[page_index]
             # reload Previous Rectangles
+            assert len(target_rects) == len(target_texts) == len(target_labels)
             for rect_index in target_rects:
                 x1,y1,x2,y2=self.canv.coords(rect_index)
-                print self.canv.create_rectangle(x1,y1,x2,y2 , fill = '')
+                rect_ind =self.canv.create_rectangle(x1,y1,x2,y2 , fill = '')
                 #self.canv.coords(self.rect, self.start_x, self.start_y, curX, curY)
+                self._add_rect(rect_ind  , self.image_counter)
 
-            # reload Previous Label text
-            for label_index in target_labels:
-                x1, y1, x2, y2 = self.canv.coords(rect_index)
-                print self.canv.create_rectangle(x1, y1, x2, y2, fill='')
-                # self.canv.coords(self.rect, self.start_x, self.start_y, curX, curY)
+            for i,text_index in enumerate(target_texts):
+                x1, y1 = self.canv.coords(text_index)
+                text_ind = self.canv.create_text(x1, y1, text='LABEL : {}'.format(target_labels[i]))
+                self._add_text(text_ind, self.image_counter)
+                self._add_labels(target_labels[i] , self.image_counter)
 
-                    # reload Previous Rectangles
+            self._renew_coordinates(self.image_counter)
+
+
+
+
+
+                # reload Previous Rectangles
 
     # export Json
     def export_coords(self):
@@ -208,6 +214,15 @@ class VideoTagging(Frame):
             self.rects[index].append(rect)
         except KeyError as ke:
             self.rects[index] = [rect]
+
+    def _add_text(self , text ,index ):
+        try:
+            self.texts[index].append(text)
+        except KeyError as ke:
+            self.texts[index] = [text]
+
+
+
 
     def _hidden_rects(self , index):
         try:
@@ -382,11 +397,8 @@ class VideoTagging(Frame):
 
             x1,y1,x2,y2=self.canv.coords(self.rect)
             text_index = self.canv.create_text(x1, y1-10, text="LABEL : {}".format(label))
+            self._add_text(text_index , self.image_counter)
 
-            try:
-                self.texts[self.image_counter].append(text_index)
-            except KeyError as ke:
-                self.texts[self.image_counter] = [text_index]
 
         elif self.entry.get() == '' and event.char == '\r': # focus 가 벗어나면 alert msg 보이고 다시 focus을 entry에 줍니다
             messagebox.showinfo('Label 을 입력하세요')
