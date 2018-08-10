@@ -19,6 +19,7 @@ class VideoTagging(Frame):
         self.draw_Canvas(self.img_paths[0] )
         self.labels = {}  # key = page , value = [label]
         self.rects = {} # key = page , value = [label]
+        self.texts = {} # Canvas 객체에 저장되는 labels 의 종류를 확인합니다.
         self.jsondir = './coordinates'
     # video 에서 이미지를 추출합니다
     def _extractImages(self, pathIn, pathOut):
@@ -60,7 +61,7 @@ class VideoTagging(Frame):
     def get_photo_images(self , paths):
         dirpath, filename  = os.path.split(paths[0])
         ret_list = []
-        for i in range(len(paths)-1):
+        for i in range(len(paths)):
             filepath = os.path.join(dirpath, 'frame{}.jpg'.format(i))
             img = Image.open(filepath)
             ret_list.append(ImageTk.PhotoImage(img))
@@ -75,11 +76,13 @@ class VideoTagging(Frame):
         """
         # 이전 페이지에 있던 정보를 다 지워 버립니다
         self._hidden_rects(self.image_counter)
+        self._hidden_texts(self.image_counter)
         # 새로운 이미지를 Canvas 에 띄웁니다
         self.image_counter += 1
         self.canv.itemconfig(self.image_on_canvas, image= self.img_list[self.image_counter])
         # 새로운 이미지에 matching 되는 rect 들의 정보들을 가져와 화면에 그립니다.
         self._load_rects(self.image_counter)
+        self._load_texts(self.image_counter)
         # 이미지의 순서를 보여줍니다
         self.text_label1['text']="{}/{}".format(self.image_counter ,len(self.img_list))
         # reload coordinate
@@ -93,13 +96,16 @@ class VideoTagging(Frame):
         """
         # 이전 페이지에 있던 정보를 다 지워 버립니다
         self._hidden_rects(self.image_counter)
+        self._hidden_texts(self.image_counter)
         # 새로운 이미지를 Canvas 에 띄웁니다
         self.image_counter -= 1
         self.canv.itemconfig(self.image_on_canvas, image= self.img_list[self.image_counter])
         # 새로운 이미지에 matching 되는 rect 들의 정보들을 가져와 화면에 그립니다.
         self._load_rects(self.image_counter)
+        self._load_texts(self.image_counter)
         # 이미지의 순서를 보여줍니다
         self.text_label1['text']="{}/{}".format(self.image_counter ,len(self.img_list))
+
         # reload coordinate
         self._renew_coordinates(self.image_counter)
 
@@ -111,12 +117,20 @@ class VideoTagging(Frame):
         else:
             target_rects = self.rects[page_index]
             target_labels = self.labels[page_index]
+            target_text = self.labels[page_index]
+            # reload Previous Rectangles
+            for rect_index in target_rects:
+                x1,y1,x2,y2=self.canv.coords(rect_index)
+                print self.canv.create_rectangle(x1,y1,x2,y2 , fill = '')
+                #self.canv.coords(self.rect, self.start_x, self.start_y, curX, curY)
 
-            x1,y1,x2,y2=self.canv.coords(target_rects[0])
-            print self.canv.create_rectangle(x1,y1,x2,y2 , fill = '')
-            #self.canv.coords(self.rect, self.start_x, self.start_y, curX, curY)
+            # reload Previous Label text
+            for label_index in target_labels:
+                x1, y1, x2, y2 = self.canv.coords(rect_index)
+                print self.canv.create_rectangle(x1, y1, x2, y2, fill='')
+                # self.canv.coords(self.rect, self.start_x, self.start_y, curX, curY)
 
-
+                    # reload Previous Rectangles
 
     # export Json
     def export_coords(self):
@@ -199,7 +213,6 @@ class VideoTagging(Frame):
         try:
             for rect in self.rects[index]:
                 self.canv.itemconfig(rect ,state='hidden' )
-                print 'hidden'
         except KeyError as ke:
             return ;
         except Exception as e:
@@ -207,12 +220,34 @@ class VideoTagging(Frame):
             print e
             exit()
 
+
     def _load_rects(self , index):
         try:
             for rect in self.rects[index]:
-
                 self.canv.itemconfig(rect ,state='normal' )
-                print 'normal'
+        except KeyError as ke:
+            return ;
+        except Exception as e:
+            print 'Error from def _delete_rects'
+            print e
+            exit()
+
+    def _hidden_texts(self, index):
+        try:
+            for text in self.texts[index]:
+                self.canv.itemconfig(text, state='hidden')
+
+        except KeyError as ke:
+            return;
+        except Exception as e:
+            print 'Error from def _delete_rects'
+            print e
+            exit()
+
+    def _load_texts(self , index):
+        try:
+            for text in self.texts[index]:
+                self.canv.itemconfig(text ,state='normal' )
         except KeyError as ke:
             return ;
         except Exception as e:
@@ -344,7 +379,14 @@ class VideoTagging(Frame):
             # digit checking
             self.save_rect_label(self.rect, label, self.image_counter)
             self._renew_coordinates(self.image_counter)
-            pass;
+
+            x1,y1,x2,y2=self.canv.coords(self.rect)
+            text_index = self.canv.create_text(x1, y1-10, text="LABEL : {}".format(label))
+
+            try:
+                self.texts[self.image_counter].append(text_index)
+            except KeyError as ke:
+                self.texts[self.image_counter] = [text_index]
 
         elif self.entry.get() == '' and event.char == '\r': # focus 가 벗어나면 alert msg 보이고 다시 focus을 entry에 줍니다
             messagebox.showinfo('Label 을 입력하세요')
