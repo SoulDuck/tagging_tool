@@ -23,17 +23,24 @@ class VideoTagging(Frame):
     # video 에서 이미지를 추출합니다
     def _extractImages(self, pathIn, pathOut):
         self.vidcap = cv2.VideoCapture(pathIn)
-
         count = 0
         success, image = self.vidcap.read()
         success = True
         self.ext = 'jpg'
+        if os.path.exists(pathOut):
+            print '{} folder is already exists!'.format(pathOut)
+            return
+        else:
+            os.makedirs(pathOut)
+
+
         while success:
             self.vidcap.set(cv2.CAP_PROP_POS_MSEC, ( count * 100 ))  # added this line
             success, image = self.vidcap.read()
-            print ('Read a new frame: ', success)
-            cv2.imwrite(os.path.join(pathOut, "frame{}.{}".format(count , self.ext)), image)  # save frame as JPEG file
-            count = count + 1
+            sys.stdout.write('\r {}'.format(count)) ; sys.stdout.flush()
+            if success:
+                cv2.imwrite(os.path.join(pathOut, "frame{}.{}".format(count , self.ext)), image)  # save frame as JPEG file
+                count = count + 1
 
     def get_video_height(self):
         self.video_height = self.vidcap.get(3)
@@ -45,7 +52,6 @@ class VideoTagging(Frame):
         paths=glob.glob(os.path.join(imgdir , '*.{}'.format(self.ext)))
         print '# Images : {}'.format(len(paths))
         return paths
-
 
     def _init_coord(self):
         self.start_x, self.start_y = 0, 0
@@ -97,6 +103,21 @@ class VideoTagging(Frame):
         # reload coordinate
         self._renew_coordinates(self.image_counter)
 
+    def prev_coordinates_load(self):
+        # 특정 page의 rect 정보를 어떻게 가져오지??관리하는 ...뭐가 있나 --> self.rects
+        page_index = self.image_counter - 1
+        if page_index == -1 :
+            messagebox.showinfo('0번째 페이지 입니다')
+        else:
+            target_rects = self.rects[page_index]
+            target_labels = self.labels[page_index]
+
+            x1,y1,x2,y2=self.canv.coords(target_rects[0])
+            print self.canv.create_rectangle(x1,y1,x2,y2 , fill = '')
+            #self.canv.coords(self.rect, self.start_x, self.start_y, curX, curY)
+
+
+
     # export Json
     def export_coords(self):
         # Json Format : {page  : {label : [1,2] , coord : [[4,5,6,7],[8,9,0,1]] }}
@@ -122,11 +143,6 @@ class VideoTagging(Frame):
         f = open(jsonpath, 'r')
         print json.load(f)
 
-
-
-
-
-
     ##### COORDINATE #####
     def _get_coordinate(self , index):
         # 해당 index 에 저장되어 있는 rect 로 부터 좌표를 추출합니다
@@ -142,7 +158,6 @@ class VideoTagging(Frame):
             print e
             print 'Error from def _get_coordinate'
             exit()
-
 
     # rect >> label >> save rect, label >> renew_coordinate
     def _renew_coordinates(self , index):
@@ -195,6 +210,7 @@ class VideoTagging(Frame):
     def _load_rects(self , index):
         try:
             for rect in self.rects[index]:
+
                 self.canv.itemconfig(rect ,state='normal' )
                 print 'normal'
         except KeyError as ke:
@@ -208,7 +224,6 @@ class VideoTagging(Frame):
         # Load Image
         img=Image.open(image_path)
         width , height =img.size
-
         # tKinter 가 적용된 이미지를 얻어온다 , prev , next 버튼을 누르면 이전 또는 다음 이미지가 불러와집니다
         self.img_list = self.get_photo_images(self.img_paths)
 
@@ -241,8 +256,17 @@ class VideoTagging(Frame):
         button3 = Button(self.root, text="prev Image", command=self.prev_image)
         button3.grid(row=1, column= 25 , sticky = W )
         # export Json
+
         button4 = Button(self.root, text="Export", command=self.export_coords)
         button4.grid(row=1, column=27, sticky=W)
+
+        #prev image copy
+        button4 = Button(self.root, text="prev rect", command=self.prev_coordinates_load)
+        button4.grid(row=1, column=28, sticky=W)
+
+        button5 = Button(self.root, text="tmp", command=self._check_rectangles)
+        button5.grid(row=1, column=29, sticky=W)
+
 
         self.entry = Entry(self.root , text = 'Hello')
         self.entry.grid(row =3 ,column = 26  )
@@ -269,15 +293,38 @@ class VideoTagging(Frame):
         self.tk_im = ImageTk.PhotoImage(img)
         self.image_on_canvas = self.canv.create_image(0,0,anchor="nw",image=self.tk_im)
 
+    # x,y 좌표를 주면 어떤 rectangle 이 속해 있는지 list을 return 합니다.
+    def _check_rectangles(self , tx ,ty , page_index):
+        ret_indices = []
+        try:
+            target_rects = self.rects[page_index]  # [[3] , [2] , [1] .. ]
+            target_labels = self.labels[page_index]  # [3,1,2, ... ]
+        except KeyError as ke :
+            # 해당 page에 target rects 가 만들어지지 않았음
+            return ret_indices
+
+        assert len(target_labels) == len(target_rects)
+        n_sample = len(target_labels)
+        for i in range(n_sample):
+            x1,y1,x2,y2=self.canv.coords(target_rects[i])
+            if x1 <= tx and x2 >= tx and y1 <= ty and y2 >= ty:
+                ret_indices.append(target_rects[i])
+
+        return ret_indices
+
 
     # Define event Callback function
     def _on_button_press(self ,event):
         self.start_x = event.x
         self.start_y = event.y
-        # self.x = self.start_x + 1
-        # self.y = self.start_y + 1
-        self.rect = self.canv.create_rectangle(self.start_x, self.start_y, self.start_x + 1, self.start_y + 1, fill="")
-        pass;
+        overlay_indices = self._check_rectangles(self.start_x , self.start_y , page_index = self.image_counter)
+        if len(overlay_indices) != 0 :
+            self.rect = overlay_indices[0] # 가장 앞쪽의 rect 을 선택한다.
+            print self.rect
+        else:
+            # self.x = self.start_x + 1
+            # self.y = self.start_y + 1
+            self.rect = self.canv.create_rectangle(self.start_x, self.start_y, self.start_x + 1, self.start_y + 1, fill="")
 
     def _on_move_press(self ,event):
         curX , curY = (event.x , event.y)
@@ -313,8 +360,15 @@ class VideoTagging(Frame):
         self.canv.focus_set()
         print "clicked at", event.x, event.y
 
+    def _focus_rectangel(self):
+        # 마우스 클릭 위치를
+        raise NotImplementedError
 
+    def _modify_rectangel(self):
+        raise NotImplementedError
 
+    def delete_rect(self):
+        raise NotImplementedError
 
 
 if __name__ == '__main__':

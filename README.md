@@ -1,6 +1,7 @@
 + Reference
     - http://effbot.org/tkinterbook/grid.htm (Grid 나누는 법)
     - https://stackoverflow.com/questions/2679418/how-to-get-the-coordinates-of-an-object-in-a-tkinter-canvas (get rectangle coordinate)
+    - http://effbot.org/zone/editing-canvas-text-items.htm (input text on Canvas class)
 
 + Canvas
     - 기본적으로 index 에 의해서 개채를 관리한다.
@@ -14,4 +15,6 @@
 + 기능들
  - 지우는 기능
  - json 파일 export 위치
+ - 이전 rectangle 좌표를 불러오는것
  -
+ - 겹치는 rectangle 처리
