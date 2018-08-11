@@ -15,12 +15,15 @@ class VideoTagging(Frame):
         self._extractImages(self.video_path, self.path_out)
         self.get_video_height()
         self.img_paths = self.get_image_paths(self.path_out)
+
         self.image_counter = 0
-        self.draw_Canvas(self.img_paths[0] )
         self.labels = {}  # key = page , value = [label]
         self.rects = {} # key = page , value = [label]
         self.texts = {} # Canvas 객체에 저장되는 labels 의 종류를 확인합니다.
         self.jsondir = './coordinates'
+        self.delete_flag = False
+
+        self.draw_Canvas(self.img_paths[0])
     # video 에서 이미지를 추출합니다
     def _extractImages(self, pathIn, pathOut):
         self.vidcap = cv2.VideoCapture(pathIn)
@@ -131,11 +134,6 @@ class VideoTagging(Frame):
                 self._add_labels(target_labels[i] , self.image_counter)
 
             self._renew_coordinates(self.image_counter)
-
-
-
-
-
                 # reload Previous Rectangles
 
     # export Json
@@ -159,9 +157,16 @@ class VideoTagging(Frame):
         json_object=json.dumps(json_dict)
         f.write(json_object)
         f.close()
-
         f = open(jsonpath, 'r')
         print json.load(f)
+
+    def _delete_elements(self):
+        if self.delete_flag:
+            page_index , list_index= self.overlay_index
+            self._del_rect( page_index , list_index)
+            self._del_label(page_index , list_index)
+            self._del_text(page_index , list_index)
+            self._renew_coordinates(self.image_counter)
 
     ##### COORDINATE #####
     def _get_coordinate(self , index):
@@ -201,12 +206,19 @@ class VideoTagging(Frame):
         else :
             return False
 
+
     ##### LABEL #####
     def _add_labels(self , value , index):
         try:
             self.labels[index].append(value)
         except KeyError as ke:
             self.labels[index] = [value]
+
+    def _del_label(self, page_index , list_index):
+        try:
+            self.labels[page_index].pop(list_index)
+        except KeyError as ke:
+            pass;
 
     ##### RECT #####
     def _add_rect(self , rect ,index):
@@ -215,13 +227,28 @@ class VideoTagging(Frame):
         except KeyError as ke:
             self.rects[index] = [rect]
 
+    def _del_rect(self, page_index , list_index):
+        try:
+            index = self.rects[page_index][list_index]
+            self.rects[page_index].pop(list_index)
+            self.canv.delete(index )
+        except KeyError as ke:
+            print ke
+            pass;
+
+    ##### Text #####
     def _add_text(self , text ,index ):
         try:
             self.texts[index].append(text)
         except KeyError as ke:
             self.texts[index] = [text]
-
-
+    def _del_text(self , page_index , list_index):
+        try:
+            index = self.texts[page_index][list_index]
+            self.texts[page_index].pop(list_index )
+            self.canv.delete(index )
+        except KeyError as ke:
+            pass;
 
 
     def _hidden_rects(self , index):
@@ -306,16 +333,17 @@ class VideoTagging(Frame):
         button3 = Button(self.root, text="prev Image", command=self.prev_image)
         button3.grid(row=1, column= 25 , sticky = W )
         # export Json
-
         button4 = Button(self.root, text="Export", command=self.export_coords)
         button4.grid(row=1, column=27, sticky=W)
-
+        # delete rects
+        button5 = Button(self.root, text="delete", command=self._delete_elements)
+        button5.grid(row=1, column=28, sticky=W)
         #prev image copy
-        button4 = Button(self.root, text="prev rect", command=self.prev_coordinates_load)
-        button4.grid(row=1, column=28, sticky=W)
-
-        button5 = Button(self.root, text="tmp", command=self._check_rectangles)
-        button5.grid(row=1, column=29, sticky=W)
+        button6 = Button(self.root, text="prev rect", command=self.prev_coordinates_load)
+        button6.grid(row=1, column=29, sticky=W)
+        # refresh
+        #button7 = Button(self.root, text="refresh", command=self.refresh)
+        #button7.grid(row=1, column=30, sticky=W)
 
 
         self.entry = Entry(self.root , text = 'Hello')
@@ -345,32 +373,50 @@ class VideoTagging(Frame):
 
     # x,y 좌표를 주면 어떤 rectangle 이 속해 있는지 list을 return 합니다.
     def _check_rectangles(self , tx ,ty , page_index):
+        ret_rects= []
+        ret_labels = []
+        ret_texts = []
         ret_indices = []
+
         try:
             target_rects = self.rects[page_index]  # [[3] , [2] , [1] .. ]
             target_labels = self.labels[page_index]  # [3,1,2, ... ]
+            target_texts = self.texts[page_index]  # [3,1,2, ... ]
         except KeyError as ke :
             # 해당 page에 target rects 가 만들어지지 않았음
-            return ret_indices
-
+            return ret_rects , ret_labels, ret_texts ,ret_indices
         assert len(target_labels) == len(target_rects)
         n_sample = len(target_labels)
         for i in range(n_sample):
             x1,y1,x2,y2=self.canv.coords(target_rects[i])
             if x1 <= tx and x2 >= tx and y1 <= ty and y2 >= ty:
-                ret_indices.append(target_rects[i])
+                ret_rects.append(target_rects[i])
+                ret_labels.append(target_labels[i])
+                ret_texts.append(target_texts[i])
+                ret_indices.append((page_index , i))
 
-        return ret_indices
 
+        return ret_rects  , ret_labels ,ret_texts ,ret_indices
 
     # Define event Callback function
     def _on_button_press(self ,event):
         self.start_x = event.x
         self.start_y = event.y
-        overlay_indices = self._check_rectangles(self.start_x , self.start_y , page_index = self.image_counter)
-        if len(overlay_indices) != 0 :
-            self.rect = overlay_indices[0] # 가장 앞쪽의 rect 을 선택한다.
-            print self.rect
+        self.delete_flag = False
+
+        overlay_rects, overlay_labels, overlay_texts, overlay_indices = self._check_rectangles(self.start_x,
+                                                                                               self.start_y,
+                                                                                               self.image_counter)
+        print overlay_labels
+        if len(overlay_rects) != 0 :
+            self.delete_flag = True
+            self.rect = overlay_rects[0] # 가장 앞쪽의 rect 을 선택한다.
+            self.text = overlay_texts[0]  # 가장 앞쪽의 rect 을 선택한다.
+            self.label = overlay_labels[0]  # 가장 앞쪽의 rect 을 선택한다.
+            self.overlay_index = overlay_indices[0]  # 가장 앞쪽의 rect 을 선택한다.
+            print 'overlay rect , text ,label '.format(self.rect , self.text , self.label)
+            print self.rect , self.text , self.label
+
         else:
             # self.x = self.start_x + 1
             # self.y = self.start_y + 1
@@ -387,7 +433,8 @@ class VideoTagging(Frame):
     def _input_label(self , event):
         # Label 을 입력합니다.
         # input digit >> check digit >> press enter >> save rect , label >> renew coordinate
-        print self.entry.focus_get()
+
+        self.entry.focus_get()
         if self.entry.get() != '' and event.char == '\r':
             label = self.entry.get()
             self.entry.delete(0, END)
@@ -405,7 +452,6 @@ class VideoTagging(Frame):
             self.entry.delete(0, END)
             self.entry.focus_set()
 
-
     def save_rect_label(self , rect ,label  , index ):
         self._add_rect(rect , index)
         self._add_labels(label , index)
@@ -421,8 +467,6 @@ class VideoTagging(Frame):
     def _modify_rectangel(self):
         raise NotImplementedError
 
-    def delete_rect(self):
-        raise NotImplementedError
 
 
 if __name__ == '__main__':

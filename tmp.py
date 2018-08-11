@@ -1,35 +1,24 @@
-from Tkinter import *
+import json
+import os
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from PIL import Image
+f = open('coordinates/coordinates.json' , 'r')
+ob = json.load(f )
+ob['0']['coords']
 
-master = Tk()
+dirpath = '20180710_131414'
+fname = 'frame0.jpg'
+fpath  =  os.path.join(dirpath , fname)
+img=Image.open(fpath)
+fig = plt.figure()
+ax=fig.add_subplot(111)
 
-e = Entry(master)
-e.pack()
-
-e.focus_set()
-
-def callback():
-    print e.get()
-
-b = Button(master, text="get", width=10, command=callback)
-b.pack()
-
-mainloop()
-e = Entry(master, width=50)
-e.pack()
-
-text = e.get()
-def makeentry(parent, caption, width=None, **options):
-    Label(parent, text=caption).pack(side=LEFT)
-    entry = Entry(parent, **options)
-    if width:
-        entry.config(width=width)
-    entry.pack(side=LEFT)
-    return entry
-
-user = makeentry(parent, "User name:", 10)
-password = makeentry(parent, "Password:", 10, show="*")
-content = StringVar()
-entry = Entry(parent, text=caption, textvariable=content)
-
-text = content.get()
-content.set(text)
+for rect in ob['0']['coords']:
+    x1,y1,x2,y2=rect
+    w = x2 - x1
+    h = y2 - y1
+    rect=patches.Rectangle((x1,y1 ) , w, h )
+    ax.add_patch(rect)
+plt.imshow(img)
+plt.show()
